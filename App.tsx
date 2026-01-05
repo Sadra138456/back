@@ -44,11 +44,13 @@ function Content() {
   // Fetch Data on Load
   const fetchData = async () => {
     try {
+        // We add ?t=Date.now() to prevent browser caching of the JSON data
+        const timestamp = Date.now();
         const [repoRes, artRes, profileRes, skillRes] = await Promise.all([
-            fetch(`${API_BASE_URL}/projects.php`),
-            fetch(`${API_BASE_URL}/articles.php`),
-            fetch(`${API_BASE_URL}/profile.php`),
-            fetch(`${API_BASE_URL}/skills.php`)
+            fetch(`${API_BASE_URL}/projects.php?t=${timestamp}`),
+            fetch(`${API_BASE_URL}/articles.php?t=${timestamp}`),
+            fetch(`${API_BASE_URL}/profile.php?t=${timestamp}`),
+            fetch(`${API_BASE_URL}/skills.php?t=${timestamp}`)
         ]);
         
         // Defensive coding: Only set state if data is explicitly an array
@@ -79,12 +81,18 @@ function Content() {
                 const profileData = await profileRes.json();
                 if (profileData && profileData.avatarUrl) {
                     let avatar = profileData.avatarUrl;
-                    if (avatar && !avatar.startsWith('http') && !avatar.startsWith('./')) {
-                        if (window.location.hostname !== 'sadracheraghi.ir') {
-                            avatar = `https://sadracheraghi.ir/${avatar}`;
-                        }
+                    
+                    // Logic to handle relative paths from backend
+                    // If avatar starts with '/' (e.g. /images/avatar.jpg), append API_BASE_URL
+                    if (avatar.startsWith('/')) {
+                        avatar = `${API_BASE_URL}${avatar}`;
                     }
-                    setUserProfile(prev => ({...prev, avatarUrl: avatar || prev.avatarUrl}));
+                    // Handle './' just in case, though mostly local dev
+                    else if (avatar.startsWith('./')) {
+                        // Keep as is or handle if needed
+                    }
+
+                    setUserProfile(prev => ({...prev, avatarUrl: avatar}));
                 }
             } catch (e) {
                 console.error("Failed to parse profile", e);
@@ -157,9 +165,10 @@ function Content() {
             onRefresh={fetchData}
             currentAvatar={userProfile.avatarUrl}
             onUpdateAvatar={(url) => {
+                // Ensure URL is absolute immediately after update
                 let avatar = url;
-                if (window.location.hostname !== 'sadracheraghi.ir' && !avatar.startsWith('http')) {
-                    avatar = `https://sadracheraghi.ir/${avatar}`;
+                if (avatar.startsWith('/')) {
+                    avatar = `${API_BASE_URL}${avatar}`;
                 }
                 setUserProfile(prev => ({...prev, avatarUrl: avatar}));
             }}
