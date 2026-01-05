@@ -44,7 +44,6 @@ function Content() {
   // Fetch Data on Load
   const fetchData = async () => {
     try {
-        // Pointing to PHP endpoints using absolute URL
         const [repoRes, artRes, profileRes, skillRes] = await Promise.all([
             fetch(`${API_BASE_URL}/projects.php`),
             fetch(`${API_BASE_URL}/articles.php`),
@@ -52,42 +51,53 @@ function Content() {
             fetch(`${API_BASE_URL}/skills.php`)
         ]);
         
+        // Defensive coding: Only set state if data is explicitly an array
         if (repoRes.ok) {
-            const data = await repoRes.json();
-            if (Array.isArray(data) && data.length > 0) {
-                setRepositories(data);
-                setPinnedRepos(data.filter((r: Repository) => r.isPinned));
+            try {
+                const data = await repoRes.json();
+                const safeRepos = Array.isArray(data) ? data : [];
+                setRepositories(safeRepos);
+                // Filter pins only if we have repos, otherwise empty
+                setPinnedRepos(safeRepos.filter((r: Repository) => r.isPinned));
+            } catch (e) {
+                console.error("Failed to parse projects", e);
+                setRepositories([]);
             }
         }
         
         if (artRes.ok) {
-            const data = await artRes.json();
-             if (Array.isArray(data)) setArticles(data);
+            try {
+                const data = await artRes.json();
+                setArticles(Array.isArray(data) ? data : []);
+            } catch (e) {
+                 setArticles([]);
+            }
         }
 
         if (profileRes.ok) {
-            const profileData = await profileRes.json();
-            if (profileData.avatarUrl) {
-                // If the URL is relative (starts with my_back), prepend domain if needed or use as is if served from same domain.
-                // Assuming PHP returns 'my_back/uploads/...' and we are on different domain or same, let's ensure it loads.
-                // If api is on sadracheraghi.ir/my_back, and image is returned as 'my_back/uploads/x.jpg' relative to root...
-                // We might need to construct full URL if the frontend is hosted elsewhere (like localhost).
-                // But if deployed on same server, relative works. 
-                // To be safe with the requested URL structure:
-                let avatar = profileData.avatarUrl;
-                if (avatar && !avatar.startsWith('http') && !avatar.startsWith('./')) {
-                     // If PHP returns 'my_back/uploads/...' we might want to prepend domain if we are developing locally against remote API
-                     if (window.location.hostname !== 'sadracheraghi.ir') {
-                         avatar = `https://sadracheraghi.ir/${avatar}`;
-                     }
+            try {
+                const profileData = await profileRes.json();
+                if (profileData && profileData.avatarUrl) {
+                    let avatar = profileData.avatarUrl;
+                    if (avatar && !avatar.startsWith('http') && !avatar.startsWith('./')) {
+                        if (window.location.hostname !== 'sadracheraghi.ir') {
+                            avatar = `https://sadracheraghi.ir/${avatar}`;
+                        }
+                    }
+                    setUserProfile(prev => ({...prev, avatarUrl: avatar || prev.avatarUrl}));
                 }
-                setUserProfile(prev => ({...prev, avatarUrl: avatar || prev.avatarUrl}));
+            } catch (e) {
+                console.error("Failed to parse profile", e);
             }
         }
 
         if (skillRes.ok) {
-             const data = await skillRes.json();
-             if (Array.isArray(data)) setSkillsList(data);
+             try {
+                 const data = await skillRes.json();
+                 setSkillsList(Array.isArray(data) ? data : []);
+             } catch (e) {
+                 setSkillsList([]);
+             }
         }
 
     } catch (e) {
@@ -141,8 +151,8 @@ function Content() {
   if (view === 'ADMIN' && authToken) {
       return (
         <Dashboard 
-            repositories={repositories} 
-            skills={skillsList}
+            repositories={Array.isArray(repositories) ? repositories : []} 
+            skills={Array.isArray(skillsList) ? skillsList : []}
             onLogout={() => { setAuthToken(null); setView('HOME'); }}
             onRefresh={fetchData}
             currentAvatar={userProfile.avatarUrl}
@@ -160,7 +170,8 @@ function Content() {
   // Helper to group skills
   const getGroupedSkills = () => {
     const grouped: Record<string, Skill[]> = {};
-    skillsList.forEach(skill => {
+    const safeSkills = Array.isArray(skillsList) ? skillsList : [];
+    safeSkills.forEach(skill => {
         if (!grouped[skill.category]) grouped[skill.category] = [];
         grouped[skill.category].push(skill);
     });
@@ -180,6 +191,12 @@ function Content() {
 
   // Content Renderer based on Tabs (Only used when view === 'HOME')
   const renderTabContent = () => {
+    // Ensure arrays are safe before rendering
+    const safeRepos = Array.isArray(repositories) ? repositories : [];
+    const safePinned = Array.isArray(pinnedRepos) ? pinnedRepos : [];
+    const safeSkills = Array.isArray(skillsList) ? skillsList : [];
+    const safeArticles = Array.isArray(articles) ? articles : [];
+
     switch (activeTab) {
       case TabView.OVERVIEW:
         return (
@@ -193,7 +210,7 @@ function Content() {
                     </p>
                     <h4 className="text-gh-text mb-2 text-sm uppercase tracking-wider font-bold">{t('techStack')}</h4>
                     <div className="flex flex-wrap gap-1">
-                        {skillsList.map(s => (
+                        {safeSkills.map(s => (
                             <img 
                                 key={s.name}
                                 src={`https://img.shields.io/badge/${s.name.replace(/\s/g, '_')}-21262d?style=flat-square&logo=${s.name.toLowerCase()}&logoColor=white`} 
@@ -211,7 +228,7 @@ function Content() {
                   <span className="text-xs text-gh-secondary cursor-pointer hover:text-gh-link">{t('customizePins')}</span>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {pinnedRepos.length > 0 ? pinnedRepos.map(repo => (
+                  {safePinned.length > 0 ? safePinned.map(repo => (
                     <RepoCard key={repo.name} repo={repo} onClick={handleRepoClick} />
                   )) : <div className="text-sm text-gh-secondary col-span-2">No pinned repositories yet. Login to dashboard to add one.</div>}
                 </div>
@@ -221,7 +238,7 @@ function Content() {
                 <div className="flex justify-between items-baseline mb-2">
                   <h2 className="text-[16px] text-gh-text font-normal">{t('contributionActivity')}</h2>
                 </div>
-                <ContributionGraph repositories={repositories} />
+                <ContributionGraph repositories={safeRepos} />
              </div>
           </div>
         );
@@ -245,7 +262,7 @@ function Content() {
                     </div>
                  </div>
                  <div className="flex flex-col gap-0">
-                    {repositories.map(repo => (
+                    {safeRepos.map(repo => (
                         <div key={repo.name} className="border-b border-gh-border py-6 first:pt-0">
                             <div className="flex items-start justify-between">
                                 <div className="flex flex-col gap-1">
@@ -320,12 +337,12 @@ function Content() {
               <div className="grid grid-cols-1 gap-4">
                   <div className="flex justify-between items-center border-b border-gh-border pb-4 mb-2">
                       <h2 className="text-xl font-bold">{t('articles')}</h2>
-                      <span className="bg-[#21262d] text-gh-secondary px-2 py-0.5 rounded-full text-xs">{articles.length}</span>
+                      <span className="bg-[#21262d] text-gh-secondary px-2 py-0.5 rounded-full text-xs">{safeArticles.length}</span>
                   </div>
-                  {articles.length === 0 ? (
+                  {safeArticles.length === 0 ? (
                       <div className="text-center py-12 text-gh-secondary">{t('noArticles')}</div>
                   ) : (
-                      articles.map(article => (
+                      safeArticles.map(article => (
                           <div key={article.id} className="border border-gh-border rounded-md p-4 bg-gh-bg hover:border-gh-secondary transition-colors">
                               <div className="flex justify-between items-start mb-2">
                                   <h3 
@@ -415,7 +432,7 @@ function Content() {
                             }`}
                         >
                             <Book size={16} className="text-gh-secondary" /> {t('repositories')}
-                            <span className="bg-[#21262d] text-gh-text text-xs rounded-full px-2 py-0.5 ms-1">{repositories.length}</span>
+                            <span className="bg-[#21262d] text-gh-text text-xs rounded-full px-2 py-0.5 ms-1">{Array.isArray(repositories) ? repositories.length : 0}</span>
                         </button>
                         <button 
                             onClick={() => setActiveTab(TabView.SKILLS)}
