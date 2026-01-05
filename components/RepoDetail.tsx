@@ -69,12 +69,17 @@ export const RepoDetail: React.FC<RepoDetailProps> = ({ repo }) => {
           const res = await fetch(`${API_BASE_URL}/files.php?id=${repo.id}&path=${encodeURIComponent(path)}`);
           if (res.ok) {
               const data = await res.json();
-              if (data.success) {
+              if (data.success && Array.isArray(data.files)) {
                   setFiles(data.files);
+              } else {
+                  setFiles([]);
               }
+          } else {
+              setFiles([]);
           }
       } catch (e) {
           console.error(e);
+          setFiles([]);
       } finally {
           setLoading(false);
       }
@@ -178,6 +183,8 @@ export const RepoDetail: React.FC<RepoDetailProps> = ({ repo }) => {
       }
       setShowDownloadMenu(false);
   };
+
+  const safeFiles = Array.isArray(files) ? files : [];
 
   return (
     <div className="w-full text-gh-text animate-fade-in">
@@ -304,7 +311,7 @@ export const RepoDetail: React.FC<RepoDetailProps> = ({ repo }) => {
                                 ..
                             </div>
                         )}
-                        {files.map((file, idx) => (
+                        {safeFiles.map((file, idx) => (
                             <div 
                                 key={idx} 
                                 onClick={() => handleFileClick(file)}
@@ -326,7 +333,7 @@ export const RepoDetail: React.FC<RepoDetailProps> = ({ repo }) => {
                                 </div>
                             </div>
                         ))}
-                        {files.length === 0 && (
+                        {safeFiles.length === 0 && (
                             <div className="p-4 text-center text-gh-secondary text-sm">Empty directory</div>
                         )}
                     </div>
