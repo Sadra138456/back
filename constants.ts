@@ -1,5 +1,6 @@
 import { UserProfile, Repository, Skill } from './types';
 
+// Removed the trailing slash to ensure valid path concatenation (e.g., .../my_back/login.php)
 export const API_BASE_URL = 'https://sadracheraghi.ir/my_back';
 
 export const USER_DATA: UserProfile = {
