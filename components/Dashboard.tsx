@@ -52,7 +52,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ repositories, skills, onLo
 
     const fetchArticles = async () => {
         try {
-            const res = await fetch(`${API_BASE_URL}/articles.php`);
+            // Add cache busting here too
+            const res = await fetch(`${API_BASE_URL}/articles.php?t=${Date.now()}`);
             if (res.ok) {
                 const data = await res.json();
                 setArticles(Array.isArray(data) ? data : []);
@@ -186,7 +187,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ repositories, skills, onLo
             const res = await fetch(`${API_BASE_URL}/profile.php`, { method: 'POST', body: formData });
             if (res.ok) {
                 const data = await res.json();
-                onUpdateAvatar(data.avatarUrl);
+                // Construct absolute URL for the frontend immediately
+                // The backend returns relative path like '/images/avatar-123.jpg'
+                const fullAvatarUrl = data.avatarUrl.startsWith('/') 
+                    ? `${API_BASE_URL}${data.avatarUrl}` 
+                    : data.avatarUrl;
+                
+                onUpdateAvatar(fullAvatarUrl);
+                setAvatarPreview(fullAvatarUrl);
                 alert('Avatar updated!');
             }
         } catch (error) { console.error(error); } finally { setAvatarUploading(false); }
