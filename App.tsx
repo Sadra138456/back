@@ -41,75 +41,53 @@ function Content() {
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isFollowOpen, setIsFollowOpen] = useState(false);
 
+  // Robust Fetch Helper
+  const fetchSafe = async (endpoint: string) => {
+    try {
+        const timestamp = Date.now();
+        const res = await fetch(`${API_BASE_URL}/${endpoint}?t=${timestamp}`);
+        if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+        const data = await res.json();
+        return data;
+    } catch (e) {
+        console.warn(`Failed to fetch ${endpoint}:`, e);
+        return null; // Return null so we can handle it gracefully
+    }
+  };
+
   // Fetch Data on Load
   const fetchData = async () => {
-    try {
-        // We add ?t=Date.now() to prevent browser caching of the JSON data
-        const timestamp = Date.now();
-        const [repoRes, artRes, profileRes, skillRes] = await Promise.all([
-            fetch(`${API_BASE_URL}/projects.php?t=${timestamp}`),
-            fetch(`${API_BASE_URL}/articles.php?t=${timestamp}`),
-            fetch(`${API_BASE_URL}/profile.php?t=${timestamp}`),
-            fetch(`${API_BASE_URL}/skills.php?t=${timestamp}`)
-        ]);
+    // We run fetches in parallel but handle them individually so one failure doesn't break everything
+    const [repoData, artData, profileData, skillData] = await Promise.all([
+        fetchSafe('projects.php'),
+        fetchSafe('articles.php'),
+        fetchSafe('profile.php'),
+        fetchSafe('skills.php')
+    ]);
         
-        // Defensive coding: Only set state if data is explicitly an array
-        if (repoRes.ok) {
-            try {
-                const data = await repoRes.json();
-                const safeRepos = Array.isArray(data) ? data : [];
-                setRepositories(safeRepos);
-                // Filter pins only if we have repos, otherwise empty
-                setPinnedRepos(safeRepos.filter((r: Repository) => r.isPinned));
-            } catch (e) {
-                console.error("Failed to parse projects", e);
-                setRepositories([]);
-            }
-        }
-        
-        if (artRes.ok) {
-            try {
-                const data = await artRes.json();
-                setArticles(Array.isArray(data) ? data : []);
-            } catch (e) {
-                 setArticles([]);
-            }
-        }
+    // 1. Handle Repositories
+    if (Array.isArray(repoData)) {
+        setRepositories(repoData);
+        setPinnedRepos(repoData.filter((r: Repository) => r.isPinned));
+    }
 
-        if (profileRes.ok) {
-            try {
-                const profileData = await profileRes.json();
-                if (profileData && profileData.avatarUrl) {
-                    let avatar = profileData.avatarUrl;
-                    
-                    // Logic to handle relative paths from backend
-                    // If avatar starts with '/' (e.g. /images/avatar.jpg), append API_BASE_URL
-                    if (avatar.startsWith('/')) {
-                        avatar = `${API_BASE_URL}${avatar}`;
-                    }
-                    // Handle './' just in case, though mostly local dev
-                    else if (avatar.startsWith('./')) {
-                        // Keep as is or handle if needed
-                    }
+    // 2. Handle Articles
+    if (Array.isArray(artData)) {
+        setArticles(artData);
+    }
 
-                    setUserProfile(prev => ({...prev, avatarUrl: avatar}));
-                }
-            } catch (e) {
-                console.error("Failed to parse profile", e);
-            }
+    // 3. Handle Profile
+    if (profileData && typeof profileData === 'object' && profileData.avatarUrl) {
+        let avatar = profileData.avatarUrl;
+        if (avatar.startsWith('/')) {
+            avatar = `${API_BASE_URL}${avatar}`;
         }
+        setUserProfile(prev => ({...prev, ...profileData, avatarUrl: avatar}));
+    }
 
-        if (skillRes.ok) {
-             try {
-                 const data = await skillRes.json();
-                 setSkillsList(Array.isArray(data) ? data : []);
-             } catch (e) {
-                 setSkillsList([]);
-             }
-        }
-
-    } catch (e) {
-        console.log("Running in offline mode or backend not ready");
+    // 4. Handle Skills
+    if (Array.isArray(skillData)) {
+        setSkillsList(skillData);
     }
   };
 
@@ -165,7 +143,6 @@ function Content() {
             onRefresh={fetchData}
             currentAvatar={userProfile.avatarUrl}
             onUpdateAvatar={(url) => {
-                // Ensure URL is absolute immediately after update
                 let avatar = url;
                 if (avatar.startsWith('/')) {
                     avatar = `${API_BASE_URL}${avatar}`;
@@ -200,7 +177,6 @@ function Content() {
 
   // Content Renderer based on Tabs (Only used when view === 'HOME')
   const renderTabContent = () => {
-    // Ensure arrays are safe before rendering
     const safeRepos = Array.isArray(repositories) ? repositories : [];
     const safePinned = Array.isArray(pinnedRepos) ? pinnedRepos : [];
     const safeSkills = Array.isArray(skillsList) ? skillsList : [];
