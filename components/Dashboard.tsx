@@ -53,7 +53,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ repositories, skills, onLo
     const fetchArticles = async () => {
         try {
             const res = await fetch(`${API_BASE_URL}/articles.php`);
-            if (res.ok) setArticles(await res.json());
+            if (res.ok) {
+                const data = await res.json();
+                setArticles(Array.isArray(data) ? data : []);
+            }
         } catch(e) { console.error(e); }
     };
 
@@ -206,6 +209,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ repositories, skills, onLo
         try { await fetch(`${API_BASE_URL}/projects.php?id=${id}&action=pin`, { method: 'PATCH' }); onRefresh(); } catch (e) { console.error(e); }
     };
 
+    // Safe guards
+    const safeRepos = Array.isArray(repositories) ? repositories : [];
+    const safeSkills = Array.isArray(skills) ? skills : [];
+    const safeArticles = Array.isArray(articles) ? articles : [];
+
     return (
         <div className="min-h-screen bg-[#0d1117] text-gh-text p-6 font-sans" dir={dir}>
             <div className="max-w-6xl mx-auto">
@@ -277,7 +285,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ repositories, skills, onLo
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gh-border">
-                                        {repositories.map(repo => (
+                                        {safeRepos.map(repo => (
                                             <tr key={repo.id || repo.name} className="hover:bg-[#21262d]/50">
                                                 <td className="p-4 font-semibold">{repo.name}</td>
                                                 <td className="p-4 flex items-center gap-2">
@@ -302,10 +310,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ repositories, skills, onLo
                                     </button>
                                 </div>
                                 <div className="divide-y divide-gh-border">
-                                    {articles.length === 0 ? (
+                                    {safeArticles.length === 0 ? (
                                         <div className="p-8 text-center text-gh-secondary">No articles yet.</div>
                                     ) : (
-                                        articles.map(art => (
+                                        safeArticles.map(art => (
                                             <div key={art.id} className="p-4 flex justify-between items-center hover:bg-[#21262d]/50">
                                                 <div>
                                                     <h4 className="font-bold text-gh-text">{art.title}</h4>
@@ -336,7 +344,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ repositories, skills, onLo
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gh-border">
-                                        {skills.map(skill => (
+                                        {safeSkills.map(skill => (
                                             <tr key={skill.name} className="hover:bg-[#21262d]/50">
                                                 <td className="p-4 font-semibold">{skill.name}</td>
                                                 <td className="p-4">
