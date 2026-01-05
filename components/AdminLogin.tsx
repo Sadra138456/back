@@ -17,21 +17,28 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin, onCancel }) => 
         setLoading(true);
         setError('');
 
+        // Using FormData ensures PHP can read it via $_POST['password']
+        // This is more robust than sending JSON for simple PHP backends
+        const formData = new FormData();
+        formData.append('password', password.trim());
+
         try {
             const res = await fetch(`${API_BASE_URL}/login.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password })
+                body: formData
             });
+            
             const data = await res.json();
             
             if (data.success) {
                 onLogin(data.token);
             } else {
-                setError('Access Denied');
+                // Show the specific message from server if available, otherwise generic
+                setError(data.message || 'Access Denied: Incorrect Password');
             }
         } catch (err) {
-            setError('Server connection failed');
+            console.error(err);
+            setError('Server connection failed. Check console.');
         } finally {
             setLoading(false);
         }
