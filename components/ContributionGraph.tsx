@@ -27,7 +27,10 @@ export const ContributionGraph: React.FC<ContributionGraphProps> = ({ repositori
     const contributions: Record<string, number> = {};
     let total = 0;
 
-    repositories.forEach(repo => {
+    // Defensive check: Ensure repositories is an array
+    const safeRepos = Array.isArray(repositories) ? repositories : [];
+
+    safeRepos.forEach(repo => {
       // We rely on repo.id being a timestamp (from server.js: Date.now().toString())
       // If repo.id is missing or not a timestamp (static data), we skip it for the graph
       if (repo.id && !isNaN(Number(repo.id))) {
