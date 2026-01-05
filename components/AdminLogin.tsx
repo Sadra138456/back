@@ -17,8 +17,6 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin, onCancel }) => 
         setLoading(true);
         setError('');
 
-        // Using FormData ensures PHP can read it via $_POST['password']
-        // This is more robust than sending JSON for simple PHP backends
         const formData = new FormData();
         formData.append('password', password.trim());
 
@@ -28,17 +26,20 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin, onCancel }) => 
                 body: formData
             });
             
+            if (res.status === 0 || res.status === 520) {
+                 throw new Error("Connection refused by server (CORS or WAF issue). Check PHP headers.");
+            }
+
             const data = await res.json();
             
             if (data.success) {
                 onLogin(data.token);
             } else {
-                // Show the specific message from server if available, otherwise generic
                 setError(data.message || 'Access Denied: Incorrect Password');
             }
-        } catch (err) {
+        } catch (err: any) {
             console.error(err);
-            setError('Server connection failed. Check console.');
+            setError(err.message || 'Server connection failed.');
         } finally {
             setLoading(false);
         }
